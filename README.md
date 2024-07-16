@@ -25,14 +25,14 @@
 
     ```bash
     # 添加子模块
-    git submodule add <your-submodule-github-addr> ./exam
+    git submodule add <your-submodule-github-addr> ./exams
     ```
 
     使用直接目录：
 
     ```bash
-    # 克隆仓库到./exam
-    git clone <your-repo-github-addr> ./exam
+    # 克隆仓库到./exams
+    git clone <your-repo-github-addr> ./exams
     ```
 
 3. 运行测试
