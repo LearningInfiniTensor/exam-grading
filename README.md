@@ -1,10 +1,10 @@
 # Exam Grading
 
-用于 [rustlings](https://github.com/rust-lang/rustlings) 和 [learning-cxx](https://github.com/LearningInfiniTensor/learning-cxx) 的自动测试评分系统
+用于基础阶段的自动测试评分系统
 
 ## InfiniTensor训练营（2024夏季）
 
-基础阶段学员将通过选择 [Rust基础-rustlings](https://github.com/rust-lang/rustlings) 或 [C++基础-learning-cxx](https://github.com/LearningInfiniTensor/learning-cxx) 进行测试，请学员通过本模板仓库创建自己的exam-grading仓库：
+基础阶段学员可选择 [Rust基础](https://opencamp.cn/InfiniTensor/camp/2024summer/stage/2) 或 [C++基础](https://opencamp.cn/InfiniTensor/camp/2024summer/stage/1) 进行，阶段及格与否通过本仓库对阶段习题进行评测，导学阶段请学员通过本模板仓库创建自己的exam-grading仓库：
 
 ![create-repo](./image/template-create-repo.png)
 
@@ -23,35 +23,17 @@
 
     可选择通过子目录或直接目录来进行测试，这里推荐以子目录方式添加：
 
-   - rustlings
-
-        ```bash
-        # 添加子模块
-        git submodule add <your-rustlings-github-addr> ./rustlings
-        ```
-
-   - learning-cxx
-
-        ```bash
-        # 添加子模块
-        git submodule add <your-learning-cxx-github-addr> ./learning-cxx
-        ```
+    ```bash
+    # 添加子模块
+    git submodule add <your-submodule-github-addr> ./exam
+    ```
 
     使用直接目录：
 
-   - rustlings
-
-        ```bash
-        # 克隆rustlings仓库到./rustlings
-        git clone <your-rustlings-addr> ./rustlings
-        ```
-
-   - learning-cxx
-
-        ```bash
-        # 克隆learning-cxx仓库到./learning-cxx
-        git clone <your-learning-cxx-addr> ./learning-cxx
-        ```
+    ```bash
+    # 克隆仓库到./exam
+    git clone <your-repo-github-addr> ./exam
+    ```
 
 3. 运行测试
 
@@ -70,4 +52,4 @@
 ## 其它
 
 - [Git子模块](https://git-scm.com/book/zh/v2/Git-%E5%B7%A5%E5%85%B7-%E5%AD%90%E6%A8%A1%E5%9D%97)
-- [InfiniTensor训练营基础阶段指导书](https://)
+- [InfiniTensor训练营导学阶段指导书](https://17999824wyj.github.io/InfiniTensor-camp-book-stage0/)
