@@ -1,0 +1,245 @@
+name: GitHub Classroom Workflow
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - 'README.md'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  TZ: Asia/Shanghai # 设置时区
+
+jobs:
+  initialize:
+    name: Initialize Submodules and Check for Experiments
+    runs-on: ubuntu-latest
+    outputs:
+      run_rustlings: ${{ steps.check.outputs.run_rustlings }}
+      run_cxx: ${{ steps.check.outputs.run_cxx }}
+      run_test: ${{ steps.check.outputs.run_test }}
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: recursive # 初始化和更新子模块
+    - name: Check for Rustlings, C++ Experiments and Other Submodules
+      id: check
+      run: |
+        if [ -d "rustlings" ]; then
+          echo "::set-output name=run_rustlings::true"
+        else
+          echo "::set-output name=run_rustlings::false"
+        fi
+        if [ -d "learning-cxx" ]; then
+          echo "::set-output name=run_cxx::true"
+        else
+          echo "::set-output name=run_cxx::false"
+        fi
+        if [ -d "exams" ]; then
+          echo "::set-output name=run_test::true"
+        else
+          echo "::set-output name=run_test::false"
+        fi
+
+  rustlings:
+    name: Rustlings Autograding
+    needs: initialize
+    if: ${{ needs.initialize.outputs.run_rustlings == 'true' }}
+    runs-on: ubuntu-latest
+    outputs:
+      details: ${{ steps.autograding.outputs.details }}
+      points: ${{ steps.autograding.outputs.points}}
+
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: 'true'
+    - name: Set up Rust environment
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        profile: minimal
+        override: true
+    - name: Install rustlings
+      run: |
+        cargo install --force rustlings
+        rustlings --version
+    - name: Copy exercises directory to project root
+      run: cp -r rustlings/exercises .
+    - name: Run tests for rustlings
+      run: cargo test --test cicv --verbose
+      continue-on-error: true
+    - uses: yfblock/os-autograding@master
+      id: autograding
+      with:
+        outputFile: .github/result/rust_result.json
+    - name: Generate summary JSON for Rustlings
+      run: |
+        outfile=".github/result/rust_result.json"
+        summary_file=".github/result/rustlings_summary.json"
+
+        # 提取需要的值
+        total_exercations=$(jq '.statistics.total_exercations' $outfile)
+        total_succeeds=$(jq '.statistics.total_succeeds' $outfile)
+        github_user="${{ github.actor }}"
+
+        # 生成新的 JSON 内容
+        new_json=$(jq -n \
+          --arg channel "github" \
+          --argjson courseId 1698 \
+          --arg ext "aaa" \
+          --arg name "$github_user" \
+          --argjson score "$total_succeeds" \
+          --argjson totalScore "$total_exercations" \
+          '{channel: $channel, courseId: $courseId, ext: $ext, name: $name, score: $score, totalScore: $totalScore}')
+
+        # 保存新的 JSON 文件
+        echo "$new_json" > $summary_file
+
+        # 打印新的 JSON 文件到终端
+        cat $summary_file
+
+    - name: Post summary JSON to remote API
+      run: |
+        summary_file=".github/result/rustlings_summary.json"
+
+        # 发送 POST 请求
+        curl -X POST "https://api.learningcamp.cn/web/api/courseRank/createByThird" \
+          -H "accept: application/json;charset=utf-8" \
+          -H "Content-Type: application/json" \
+          -d "$(cat $summary_file)" \
+          -v
+
+  cxx:
+    name: C++ Autograding
+    needs: initialize
+    if: ${{ needs.initialize.outputs.run_cxx == 'true' }}
+    runs-on: ubuntu-latest
+    outputs:
+      details: ${{ steps.autograding.outputs.details }}
+      points: ${{ steps.autograding.outputs.points}}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: 'true'
+    - name: Install xmake
+      uses: xmake-io/github-action-setup-xmake@v1
+      with:
+        xmake-version: latest
+    - name: Run tests and save output
+      run: |
+        (xmake && xmake run summary) | tee test_output.txt
+      working-directory: learning-cxx
+      continue-on-error: true
+    - name: Parse test results and generate JSON for C++
+      run: |
+        outfile="test_output.txt"
+        summary_file="./../.github/result/cxx_result.json"
+
+            # 获取最后一行信息并进行处理
+            info_line=$(tail -n 1 $outfile | sed 's/\x1b\[[0-9;]*m//g')
+
+            # 提取通过题数和总题目数量
+            total_succeeds=$(echo $info_line | cut -d' ' -f1 | cut -d'/' -f1)
+            total_exercises=$(echo $info_line | cut -d' ' -f1 | cut -d'/' -f2)
+
+            # 提取题目状态字符串
+            status_string=$(echo $info_line | cut -d' ' -f2 | tr -d '[]')
+
+            # 初始化总失败数
+            total_failures=$((total_exercises - total_succeeds))
+
+            # 遍历状态字符串并更新 JSON 中的 result 字段
+            for (( i=0; i<${#status_string}; i++ )); do
+              exercise_name=$(printf "exercise%02d" $i)
+              current_char=${status_string:$i:1}
+              if [[ $current_char == "#" ]]; then
+                result="true"
+              else
+                result="false"
+              fi
+
+              # 直接修改 JSON 文件中的相应字段
+              jq --arg name "$exercise_name" --arg result "$result" '.exercises |= map(if .name == $name then .result = ($result | test("true")) else . end)' $summary_file > tmp.json && mv tmp.json $summary_file
+            done
+
+            # 更新统计信息
+            jq --argjson succeeds "$total_succeeds" --argjson failures "$total_failures" '.statistics.total_succeeds = $succeeds | .statistics.total_failures = $failures' $summary_file > tmp.json && mv tmp.json $summary_file
+
+            # 打印新的 JSON 文件到终端
+            cat $summary_file
+      working-directory: learning-cxx
+      continue-on-error: true
+    - uses: yfblock/os-autograding@master
+      id: autograding
+      with:
+        outputFile: .github/result/cxx_result.json
+    - name: Generate summary JSON for CXX
+      run: |
+        outfile=".github/result/cxx_result.json"
+        summary_file=".github/result/cxx_summary.json"
+
+        # 提取需要的值
+        total_exercations=$(jq '.statistics.total_exercations' $outfile)
+        total_succeeds=$(jq '.statistics.total_succeeds' $outfile)
+        cxx_user="${{ github.actor }}"
+
+        # 生成新的 JSON 内容
+        new_json=$(jq -n \
+          --arg channel "github" \
+          --argjson courseId 1698 \
+          --arg ext "aaa" \
+          --arg name "$cxx_user" \
+          --argjson score "$total_succeeds" \
+          --argjson totalScore "$total_exercations" \
+          '{channel: $channel, courseId: $courseId, ext: $ext, name: $name, score: $score, totalScore: $totalScore}')
+          
+        # 保存新的 JSON 文件
+        echo "$new_json" > $summary_file
+
+        # 打印新的 JSON 文件到终端
+        cat $summary_file
+
+    - name: Post summary JSON to remote API
+      run: |
+        summary_file=".github/result/cxx_summary.json"
+
+        # 发送 POST 请求
+        curl -X POST "https://api.learningcamp.cn/web/api/courseRank/createByThird" \
+          -H "accept: application/json;charset=utf-8" \
+          -H "Content-Type: application/json" \
+          -d "$(cat $summary_file)" \
+          -v
+  test:
+    name: Test Job for Other Submodules
+    needs: initialize
+    if: ${{ needs.initialize.outputs.run_test == 'true' }}
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      with:
+        submodules: 'true'
+    - name: Post summary JSON to remote API
+      run: |
+         curl -X POST "https://api.learningcamp.cn/web/api/courseRank/createByThird" \
+          -H "accept: application/json;charset=utf-8" \
+          -H "Content-Type: application/json" \
+          -d '{
+                "channel": "github",
+                "courseId": 1698,
+                "ext": "aaa",
+                "name": "${{ github.actor }}",
+                "score": 1,
+                "totalScore": 23
+              }' \
+          -v
+
+            
+  
