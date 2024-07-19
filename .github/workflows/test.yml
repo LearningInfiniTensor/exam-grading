@@ -12,6 +12,7 @@ on:
 env:
   CARGO_TERM_COLOR: always
   TZ: Asia/Shanghai # 设置时区
+  ENCODED_API_URL: "aHR0cHM6Ly9hcGkubGVhcm5pbmdjYW1wLmNuL3dlYi9hcGkvY291cnNlUmFuay9jcmVhdGVCeVRoaXJk"
 
 jobs:
   initialize:
@@ -21,10 +22,15 @@ jobs:
       run_rustlings: ${{ steps.check.outputs.run_rustlings }}
       run_cxx: ${{ steps.check.outputs.run_cxx }}
       run_test: ${{ steps.check.outputs.run_test }}
+      api_url: ${{ steps.decode_api_url.outputs.url }}
     steps:
     - uses: actions/checkout@v3
       with:
         submodules: recursive # 初始化和更新子模块
+    - name: Decode API URL
+      id: decode_api_url
+      run: |
+        echo "url=$(echo "$ENCODED_API_URL" | base64 --decode)" >> "$GITHUB_OUTPUT"
     - name: Check for Rustlings, C++ Experiments and Other Submodules
       id: check
       run: |
@@ -52,7 +58,8 @@ jobs:
     outputs:
       details: ${{ steps.autograding.outputs.details }}
       points: ${{ steps.autograding.outputs.points}}
-
+    env:
+      API_URL: ${{ needs.initialize.outputs.api_url }}
     steps:
     - uses: actions/checkout@v3
       with:
@@ -107,7 +114,7 @@ jobs:
         summary_file=".github/result/rustlings_summary.json"
 
         # 发送 POST 请求
-        curl -X POST "https://api.learningcamp.cn/web/api/courseRank/createByThird" \
+        curl -X POST "$API_URL" \
           -H "accept: application/json;charset=utf-8" \
           -H "Content-Type: application/json" \
           -d "$(cat $summary_file)" \
@@ -121,7 +128,8 @@ jobs:
     outputs:
       details: ${{ steps.autograding.outputs.details }}
       points: ${{ steps.autograding.outputs.points}}
-
+    env:
+      API_URL: ${{ needs.initialize.outputs.api_url }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -141,38 +149,38 @@ jobs:
         outfile="test_output.txt"
         summary_file="./../.github/result/cxx_result.json"
 
-            # 获取最后一行信息并进行处理
-            info_line=$(tail -n 1 $outfile | sed 's/\x1b\[[0-9;]*m//g')
+        # 获取最后一行信息并进行处理
+        info_line=$(tail -n 1 $outfile | sed 's/\x1b\[[0-9;]*m//g')
 
-            # 提取通过题数和总题目数量
-            total_succeeds=$(echo $info_line | cut -d' ' -f1 | cut -d'/' -f1)
-            total_exercises=$(echo $info_line | cut -d' ' -f1 | cut -d'/' -f2)
+        # 提取通过题数和总题目数量
+        total_succeeds=$(echo $info_line | cut -d' ' -f1 | cut -d'/' -f1)
+        total_exercises=$(echo $info_line | cut -d' ' -f1 | cut -d'/' -f2)
 
-            # 提取题目状态字符串
-            status_string=$(echo $info_line | cut -d' ' -f2 | tr -d '[]')
+        # 提取题目状态字符串
+        status_string=$(echo $info_line | cut -d' ' -f2 | tr -d '[]')
 
-            # 初始化总失败数
-            total_failures=$((total_exercises - total_succeeds))
+        # 初始化总失败数
+        total_failures=$((total_exercises - total_succeeds))
 
-            # 遍历状态字符串并更新 JSON 中的 result 字段
-            for (( i=0; i<${#status_string}; i++ )); do
-              exercise_name=$(printf "exercise%02d" $i)
-              current_char=${status_string:$i:1}
-              if [[ $current_char == "#" ]]; then
-                result="true"
-              else
-                result="false"
-              fi
+        # 遍历状态字符串并更新 JSON 中的 result 字段
+        for (( i=0; i<${#status_string}; i++ )); do
+          exercise_name=$(printf "exercise%02d" $i)
+          current_char=${status_string:$i:1}
+          if [[ $current_char == "#" ]]; then
+            result="true"
+          else
+            result="false"
+          fi
 
-              # 直接修改 JSON 文件中的相应字段
-              jq --arg name "$exercise_name" --arg result "$result" '.exercises |= map(if .name == $name then .result = ($result | test("true")) else . end)' $summary_file > tmp.json && mv tmp.json $summary_file
-            done
+          # 直接修改 JSON 文件中的相应字段
+          jq --arg name "$exercise_name" --arg result "$result" '.exercises |= map(if .name == $name then .result = ($result | test("true")) else . end)' $summary_file > tmp.json && mv tmp.json $summary_file
+        done
 
-            # 更新统计信息
-            jq --argjson succeeds "$total_succeeds" --argjson failures "$total_failures" '.statistics.total_succeeds = $succeeds | .statistics.total_failures = $failures' $summary_file > tmp.json && mv tmp.json $summary_file
+        # 更新统计信息
+        jq --argjson succeeds "$total_succeeds" --argjson failures "$total_failures" '.statistics.total_succeeds = $succeeds | .statistics.total_failures = $failures' $summary_file > tmp.json && mv tmp.json $summary_file
 
-            # 打印新的 JSON 文件到终端
-            cat $summary_file
+        # 打印新的 JSON 文件到终端
+        cat $summary_file
       working-directory: learning-cxx
       continue-on-error: true
     - uses: yfblock/os-autograding@master
@@ -210,16 +218,19 @@ jobs:
         summary_file=".github/result/cxx_summary.json"
 
         # 发送 POST 请求
-        curl -X POST "https://api.learningcamp.cn/web/api/courseRank/createByThird" \
+        curl -X POST "$API_URL" \
           -H "accept: application/json;charset=utf-8" \
           -H "Content-Type: application/json" \
           -d "$(cat $summary_file)" \
           -v
+
   test:
     name: Test Job for Other Submodules
     needs: initialize
     if: ${{ needs.initialize.outputs.run_test == 'true' }}
     runs-on: ubuntu-latest
+    env:
+      API_URL: ${{ needs.initialize.outputs.api_url }}
 
     steps:
     - name: Checkout code
@@ -228,7 +239,7 @@ jobs:
         submodules: 'true'
     - name: Post summary JSON to remote API
       run: |
-         curl -X POST "https://api.learningcamp.cn/web/api/courseRank/createByThird" \
+         curl -X POST "$API_URL" \
           -H "accept: application/json;charset=utf-8" \
           -H "Content-Type: application/json" \
           -d '{
@@ -240,6 +251,3 @@ jobs:
                 "totalScore": 23
               }' \
           -v
-
-            
-  
