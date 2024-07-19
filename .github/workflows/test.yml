@@ -89,7 +89,7 @@ jobs:
         # 生成新的 JSON 内容
         new_json=$(jq -n \
           --arg channel "github" \
-          --argjson courseId 1698 \
+          --argjson courseId 1700 \
           --arg ext "aaa" \
           --arg name "$github_user" \
           --argjson score "$total_succeeds" \
@@ -192,7 +192,7 @@ jobs:
         # 生成新的 JSON 内容
         new_json=$(jq -n \
           --arg channel "github" \
-          --argjson courseId 1698 \
+          --argjson courseId 1699 \
           --arg ext "aaa" \
           --arg name "$cxx_user" \
           --argjson score "$total_succeeds" \
