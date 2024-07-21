@@ -5,6 +5,9 @@ exclude = [
   "tests/fixture/state",
   "tests/fixture/success",
   "dev",
+  "rustlings",
+  "learning-cxx",
+  "exams"
 ]
 
 [workspace.package]
