@@ -23,6 +23,8 @@ jobs:
       run_cxx: ${{ steps.check.outputs.run_cxx }}
       run_test: ${{ steps.check.outputs.run_test }}
       api_url: ${{ steps.decode_api_url.outputs.url }}
+      run_project2: ${{ steps.check.outputs.run_project2 }}
+      run_project1: ${{ steps.check.outputs.run_project1 }}
     steps:
     - uses: actions/checkout@v3
       with:
@@ -48,6 +50,16 @@ jobs:
           echo "::set-output name=run_test::true"
         else
           echo "::set-output name=run_test::false"
+        fi
+        if [ -d "project1" ]; then 
+          echo "::set-output name=run_project1::true"
+        else
+          echo "::set-output name=run_project1::false"
+        fi
+        if [ -d "project2" ]; then
+          echo "::set-output name=run_project2::true"
+        else
+          echo "::set-output name=run_project2::false"
         fi
 
   rustlings:
@@ -250,4 +262,231 @@ jobs:
                 "score": 1,
                 "totalScore": 23
               }' \
+          -v
+
+  project1:  
+    name: Project 1 Autograding
+    needs: initialize
+    if: ${{ needs.initialize.outputs.run_project1 == 'true' }}
+    runs-on: ubuntu-latest
+    outputs:
+      details: ${{ steps.autograding.outputs.details }}
+      points: ${{ steps.autograding.outputs.points}}
+    env:
+      API_URL: ${{ needs.initialize.outputs.api_url }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      with:
+        submodules: recursive
+    - name: Build Project 1
+      run: |
+        cd project1
+        make
+    - name: Run tests for Project 1
+      id: run_tests
+      run: |
+        make test-cpp | tee test_output.txt
+      working-directory: project1
+      continue-on-error: true
+    - name: Parse test results and generate JSON for Project 1
+      run: |
+            test_output="test_output.txt"
+            json_file="./../.github/result/project1_result.json"
+
+            # 初始化计数器
+            total_exercations=0
+            total_succeeds=0
+            total_failures=0
+            exercises_json="[]"
+
+            # 解析输出
+            while read -r line; do
+              if [[ "$line" =~ ^[0-9]+/[0-9]+[[:space:]]+Test[[:space:]]+#[0-9]+:[[:space:]]+([a-zA-Z_]+).+(Passed|Failed).*$ ]]; then
+                test_name="${BASH_REMATCH[1]}"
+                test_result="${BASH_REMATCH[2]}"
+
+                # 计数
+                total_exercations=$((total_exercations + 1))
+                if [[ $test_result == "Failed" ]]; then
+                  exercises_json=$(echo "$exercises_json" | jq --arg name "$test_name" --argjson result false '. + [{name: $name, result: $result}]')
+                  total_failures=$((total_failures + 1))
+                else
+                  exercises_json=$(echo "$exercises_json" | jq --arg name "$test_name" --argjson result true '. + [{name: $name, result: $result}]')
+                  total_succeeds=$((total_succeeds + 1))
+                fi
+              fi
+            done < "$test_output"
+
+            # 生成最终 JSON
+            final_json=$(jq -n \
+              --argjson exercises "$exercises_json" \
+              --arg user_name "null" \
+              --argjson total_exercations "$total_exercations" \
+              --argjson total_succeeds "$total_succeeds" \
+              --argjson total_failures "$total_failures" \
+              --argjson total_time 3 \
+              '{exercises: $exercises, user_name: $user_name, statistics: {total_exercations: $total_exercations, total_succeeds: $total_succeeds, total_failures: $total_failures, total_time: $total_time}}')
+
+            # 保存到 JSON 文件
+            echo "$final_json" > "$json_file"
+
+            # 打印新的 JSON 文件到终端
+            cat $json_file
+      working-directory: project1
+      continue-on-error: true
+    - uses: yfblock/os-autograding@master
+      id: autograding
+      with:
+        outputFile: .github/result/project1_result.json
+    - name: Generate summary JSON for Project 1
+      run: |
+        outfile=".github/result/project1_result.json"
+        summary_file=".github/result/project1_summary.json"
+
+        # 提取需要的值
+        total_exercations=$(jq '.statistics.total_exercations' $outfile)
+        total_succeeds=$(jq '.statistics.total_succeeds' $outfile)
+        pr1_user="${{ github.actor }}"
+
+        new_json=$(jq -n \
+          --arg channel "github" \
+          --argjson courseId 1701 \
+          --arg ext "aaa" \
+          --arg name "$pr1_user" \
+          --argjson score "$total_succeeds" \
+          --argjson totalScore "$total_exercations" \
+          '{channel: $channel, courseId: $courseId, ext: $ext, name: $name, score: $score, totalScore: $totalScore}')
+
+        echo "$new_json" > $summary_file
+        cat $summary_file
+
+    - name: Post summary JSON for Project 1
+      run: |
+        summary_file=".github/result/project1_summary.json"
+        curl -X POST "$API_URL" \
+          -H "accept: application/json;charset=utf-8" \
+          -H "Content-Type: application/json" \
+          -d "$(cat $summary_file)" \
+          -v
+
+  project2:
+    name: Project 2 Autograding
+    needs: initialize
+    if: ${{ needs.initialize.outputs.run_project2 == 'true' }}
+    runs-on: ubuntu-latest
+    outputs:
+      details: ${{ steps.autograding.outputs.details }}
+      points: ${{ steps.autograding.outputs.points}}
+    env:
+      API_URL: ${{ needs.initialize.outputs.api_url }}
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: 'true'
+    - name: Set up Rust environment for Project 2
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        profile: minimal
+        override: true
+    - name: Build Project 2
+      run: |
+        cargo build --verbose
+      working-directory: project2
+      continue-on-error: false
+    - name: Run tests for Project 2
+      id: run_tests
+      run: |
+        cargo test --verbose | tee test_output.txt
+      working-directory: project2
+      continue-on-error: true
+    - name: Parse test results and generate JSON for Project 2
+      run: |
+        test_output="test_output.txt"
+        json_file="./../.github/result/project2_result.json"
+
+        # 初始化计数器
+        total_exercations=0
+        total_succeeds=0
+        total_failures=0
+        exercises_json="["
+
+        # 从测试输出中提取测试结果
+        while IFS= read -r line; do
+          if [[ $line =~ test\ (.+)\ \.\.\.\ (FAILED|ok) ]]; then
+            test_name="${BASH_REMATCH[1]}"
+            test_result="${BASH_REMATCH[2]}"
+
+            # 计数
+            total_exercations=$((total_exercations + 1))
+            if [[ $test_result == "FAILED" ]]; then
+              exercises_json+="$(jq -n --arg name "$test_name" --argjson result false '{name: $name, result: $result}'),"
+              total_failures=$((total_failures + 1))
+            else
+              exercises_json+="$(jq -n --arg name "$test_name" --argjson result true '{name: $name, result: $result}'),"
+              total_succeeds=$((total_succeeds + 1))
+            fi
+          fi
+        done < "$test_output"
+
+        # 去掉最后一个逗号并闭合 JSON 数组
+        exercises_json="${exercises_json%,}]"
+
+        # 生成最终 JSON
+        final_json=$(jq -n \
+          --argjson exercises "$exercises_json" \
+          --arg user_name "null" \
+          --argjson total_exercations "$total_exercations" \
+          --argjson total_succeeds "$total_succeeds" \
+          --argjson total_failures "$total_failures" \
+          --argjson total_time 3 \
+          '{exercises: $exercises, user_name: $user_name, statistics: {total_exercations: $total_exercations, total_succeeds: $total_succeeds, total_failures: $total_failures, total_time: $total_time}}')
+
+        # 保存到 JSON 文件
+        echo "$final_json" > "$json_file"
+
+        # 打印新的 JSON 文件到终端
+        cat $json_file
+      working-directory: project2
+      continue-on-error: true
+    - uses: yfblock/os-autograding@master
+      id: autograding
+      with:
+        outputFile: .github/result/project2_result.json
+    - name: Generate summary JSON for Project 2
+      run: |
+        outfile=".github/result/project2_result.json"
+        summary_file=".github/result/project2_summary.json"
+
+        # 提取需要的值
+        total_exercations=$(jq '.statistics.total_exercations' $outfile)
+        total_succeeds=$(jq '.statistics.total_succeeds' $outfile)
+        pr2_user="${{ github.actor }}"
+
+        # 生成新的 JSON 内容
+        new_json=$(jq -n \
+          --arg channel "github" \
+          --argjson courseId 1699 \
+          --arg ext "aaa" \
+          --arg name "$pr2_user" \
+          --argjson score "$total_succeeds" \
+          --argjson totalScore "$total_exercations" \
+          '{channel: $channel, courseId: $courseId, ext: $ext, name: $name, score: $score, totalScore: $totalScore}')
+          
+        # 保存新的 JSON 文件
+        echo "$new_json" > $summary_file
+
+        # 打印新的 JSON 文件到终端
+        cat $summary_file
+
+    - name: Post summary JSON for Project 2
+      run: |
+        summary_file=".github/result/project2_summary.json"
+
+        # 发送 POST 请求
+        curl -X POST "$API_URL" \
+          -H "accept: application/json;charset=utf-8" \
+          -H "Content-Type: application/json" \
+          -d "$(cat $summary_file)" \
           -v
