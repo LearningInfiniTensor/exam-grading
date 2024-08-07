@@ -23,8 +23,8 @@ jobs:
       run_cxx: ${{ steps.check.outputs.run_cxx }}
       run_test: ${{ steps.check.outputs.run_test }}
       api_url: ${{ steps.decode_api_url.outputs.url }}
-      run_project2: ${{ steps.check.outputs.run_project2 }}
       run_project1: ${{ steps.check.outputs.run_project1 }}
+      run_project2: ${{ steps.check.outputs.run_project2 }}
     steps:
     - uses: actions/checkout@v3
       with:
@@ -51,12 +51,12 @@ jobs:
         else
           echo "::set-output name=run_test::false"
         fi
-        if [ -d "project1" ]; then 
+        if [ -d "TinyInfiniTensor" ]; then 
           echo "::set-output name=run_project1::true"
         else
           echo "::set-output name=run_project1::false"
         fi
-        if [ -d "project2" ]; then
+        if [ -d "learning-lm-rs" ]; then
           echo "::set-output name=run_project2::true"
         else
           echo "::set-output name=run_project2::false"
@@ -264,8 +264,8 @@ jobs:
               }' \
           -v
 
-  project1:  
-    name: Project 1 Autograding
+  TinyInfiniTensor:  
+    name: TinyInfiniTensor Autograding
     needs: initialize
     if: ${{ needs.initialize.outputs.run_project1 == 'true' }}
     runs-on: ubuntu-latest
@@ -279,17 +279,18 @@ jobs:
       uses: actions/checkout@v3
       with:
         submodules: recursive
-    - name: Build Project 1
+    - name: Build TinyInfiniTensor
       run: |
-        cd project1
         make
-    - name: Run tests for Project 1
+      working-directory: TinyInfiniTensor
+      continue-on-error: false
+    - name: Run tests for TinyInfiniTensor
       id: run_tests
       run: |
         make test-cpp | tee test_output.txt
-      working-directory: project1
+      working-directory: TinyInfiniTensor
       continue-on-error: true
-    - name: Parse test results and generate JSON for Project 1
+    - name: Parse test results and generate JSON for TinyInfiniTensor
       run: |
             test_output="test_output.txt"
             json_file="./../.github/result/project1_result.json"
@@ -333,13 +334,13 @@ jobs:
 
             # 打印新的 JSON 文件到终端
             cat $json_file
-      working-directory: project1
+      working-directory: TinyInfiniTensor
       continue-on-error: true
     - uses: yfblock/os-autograding@master
       id: autograding
       with:
         outputFile: .github/result/project1_result.json
-    - name: Generate summary JSON for Project 1
+    - name: Generate summary JSON for TinyInfiniTensor
       run: |
         outfile=".github/result/project1_result.json"
         summary_file=".github/result/project1_summary.json"
@@ -361,7 +362,7 @@ jobs:
         echo "$new_json" > $summary_file
         cat $summary_file
 
-    - name: Post summary JSON for Project 1
+    - name: Post summary JSON for TinyInfiniTensor
       run: |
         summary_file=".github/result/project1_summary.json"
         curl -X POST "$API_URL" \
@@ -370,8 +371,8 @@ jobs:
           -d "$(cat $summary_file)" \
           -v
 
-  project2:
-    name: Project 2 Autograding
+  learning-lm-rs:
+    name: learning-lm-rs Autograding
     needs: initialize
     if: ${{ needs.initialize.outputs.run_project2 == 'true' }}
     runs-on: ubuntu-latest
@@ -384,27 +385,27 @@ jobs:
     - uses: actions/checkout@v3
       with:
         submodules: 'true'
-    - name: Set up Rust environment for Project 2
+    - name: Set up Rust environment for learning-lm-rs
       uses: actions-rs/toolchain@v1
       with:
         toolchain: stable
         profile: minimal
         override: true
-    - name: Build Project 2
+    - name: Build learning-lm-rs
       run: |
         cargo build --verbose
-      working-directory: project2
+      working-directory: learning-lm-rs
       continue-on-error: false
-    - name: Run tests for Project 2
+    - name: Run tests for learning-lm-rs
       id: run_tests
       run: |
         cargo test --verbose | tee test_output.txt
-      working-directory: project2
+      working-directory: learning-lm-rs
       continue-on-error: true
-    - name: Parse test results and generate JSON for Project 2
+    - name: Parse test results and generate JSON for learning-lm-rs
       run: |
         test_output="test_output.txt"
-        json_file="./../.github/result/project2_result.json"
+        json_file="./../.github/result/learning-lm-rs_result.json"
 
         # 初始化计数器
         total_exercations=0
@@ -448,16 +449,16 @@ jobs:
 
         # 打印新的 JSON 文件到终端
         cat $json_file
-      working-directory: project2
+      working-directory: learning-lm-rs
       continue-on-error: true
     - uses: yfblock/os-autograding@master
       id: autograding
       with:
-        outputFile: .github/result/project2_result.json
+        outputFile: .github/result/learning-lm-rs_result.json
     - name: Generate summary JSON for Project 2
       run: |
-        outfile=".github/result/project2_result.json"
-        summary_file=".github/result/project2_summary.json"
+        outfile=".github/result/learning-lm-rs_result.json"
+        summary_file=".github/result/learning-lm-rs_summary.json"
 
         # 提取需要的值
         total_exercations=$(jq '.statistics.total_exercations' $outfile)
@@ -482,7 +483,7 @@ jobs:
 
     - name: Post summary JSON for Project 2
       run: |
-        summary_file=".github/result/project2_summary.json"
+        summary_file=".github/result/learning-lm-rs_summary.json"
 
         # 发送 POST 请求
         curl -X POST "$API_URL" \
