@@ -293,7 +293,7 @@ jobs:
     - name: Parse test results and generate JSON for TinyInfiniTensor
       run: |
             test_output="test_output.txt"
-            json_file="./../.github/result/project1_result.json"
+            json_file="./../.github/result/TinyInfiniTensor_result.json"
 
             # 初始化计数器
             total_exercations=0
@@ -339,11 +339,11 @@ jobs:
     - uses: yfblock/os-autograding@master
       id: autograding
       with:
-        outputFile: .github/result/project1_result.json
+        outputFile: .github/result/TinyInfiniTensor_result.json
     - name: Generate summary JSON for TinyInfiniTensor
       run: |
-        outfile=".github/result/project1_result.json"
-        summary_file=".github/result/project1_summary.json"
+        outfile=".github/result/TinyInfiniTensor_result.json"
+        summary_file=".github/result/TinyInfiniTensor_summary.json"
 
         # 提取需要的值
         total_exercations=$(jq '.statistics.total_exercations' $outfile)
@@ -364,7 +364,7 @@ jobs:
 
     - name: Post summary JSON for TinyInfiniTensor
       run: |
-        summary_file=".github/result/project1_summary.json"
+        summary_file=".github/result/TinyInfiniTensor_summary.json"
         curl -X POST "$API_URL" \
           -H "accept: application/json;charset=utf-8" \
           -H "Content-Type: application/json" \
@@ -455,7 +455,7 @@ jobs:
       id: autograding
       with:
         outputFile: .github/result/learning-lm-rs_result.json
-    - name: Generate summary JSON for Project 2
+    - name: Generate summary JSON for learning-lm-rs
       run: |
         outfile=".github/result/learning-lm-rs_result.json"
         summary_file=".github/result/learning-lm-rs_summary.json"
@@ -468,7 +468,7 @@ jobs:
         # 生成新的 JSON 内容
         new_json=$(jq -n \
           --arg channel "github" \
-          --argjson courseId 1699 \
+          --argjson courseId 1703 \
           --arg ext "aaa" \
           --arg name "$pr2_user" \
           --argjson score "$total_succeeds" \
@@ -481,7 +481,7 @@ jobs:
         # 打印新的 JSON 文件到终端
         cat $summary_file
 
-    - name: Post summary JSON for Project 2
+    - name: Post summary JSON for learning-lm-rs
       run: |
         summary_file=".github/result/learning-lm-rs_summary.json"
 
