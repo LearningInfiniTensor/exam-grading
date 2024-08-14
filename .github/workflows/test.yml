@@ -292,21 +292,37 @@ jobs:
       continue-on-error: true
     - name: Parse test results and generate JSON for TinyInfiniTensor
       run: |
-            test_output="test_output.txt"
-            json_file="./../.github/result/TinyInfiniTensor_result.json"
+        test_output="test_output.txt"
+        json_file="./../.github/result/TinyInfiniTensor_result.json"
 
-            # 初始化计数器
-            total_exercations=0
-            total_succeeds=0
-            total_failures=0
-            exercises_json="[]"
+        test_list=(
+          "test_allocator"
+          "test_graph"
+          "test_cast"
+          "test_clip"
+          "test_concat"
+          "test_element_wise"
+          "test_matmul"
+          "test_transpose"
+          "test_nativecpu_concat"
+          "test_nativecpu_elementwise"
+          "test_nativecpu_transpose"
+        )
 
-            # 解析输出
-            while read -r line; do
-              if [[ "$line" =~ ^[0-9]+/[0-9]+[[:space:]]+Test[[:space:]]+#[0-9]+:[[:space:]]+([a-zA-Z_]+).+(Passed|Failed).*$ ]]; then
-                test_name="${BASH_REMATCH[1]}"
-                test_result="${BASH_REMATCH[2]}"
+        # 初始化计数器
+        total_exercations=0
+        total_succeeds=0
+        total_failures=0
+        exercises_json="[]"
 
+        # 解析输出
+        while read -r line; do
+          if [[ "$line" =~ ^[0-9]+/[0-9]+[[:space:]]+Test[[:space:]]+#[0-9]+:[[:space:]]+([a-zA-Z_]+).+(Passed|Failed).*$ ]]; then
+            test_name="${BASH_REMATCH[1]}"
+            test_result="${BASH_REMATCH[2]}"
+
+            for element in "${test_list[@]}"; do
+              if [[ "$element" == "$test_name" ]]; then
                 # 计数
                 total_exercations=$((total_exercations + 1))
                 if [[ $test_result == "Failed" ]]; then
@@ -317,23 +333,25 @@ jobs:
                   total_succeeds=$((total_succeeds + 1))
                 fi
               fi
-            done < "$test_output"
+            done
+          fi
+        done < "$test_output"
 
-            # 生成最终 JSON
-            final_json=$(jq -n \
-              --argjson exercises "$exercises_json" \
-              --arg user_name "null" \
-              --argjson total_exercations "$total_exercations" \
-              --argjson total_succeeds "$total_succeeds" \
-              --argjson total_failures "$total_failures" \
-              --argjson total_time 3 \
-              '{exercises: $exercises, user_name: $user_name, statistics: {total_exercations: $total_exercations, total_succeeds: $total_succeeds, total_failures: $total_failures, total_time: $total_time}}')
+        # 生成最终 JSON
+        final_json=$(jq -n \
+          --argjson exercises "$exercises_json" \
+          --arg user_name "null" \
+          --argjson total_exercations "$total_exercations" \
+          --argjson total_succeeds "$total_succeeds" \
+          --argjson total_failures "$total_failures" \
+          --argjson total_time 3 \
+          '{exercises: $exercises, user_name: $user_name, statistics: {total_exercations: $total_exercations, total_succeeds: $total_succeeds, total_failures: $total_failures, total_time: $total_time}}')
 
-            # 保存到 JSON 文件
-            echo "$final_json" > "$json_file"
+        # 保存到 JSON 文件
+        echo "$final_json" > "$json_file"
 
-            # 打印新的 JSON 文件到终端
-            cat $json_file
+        # 打印新的 JSON 文件到终端
+        cat $json_file
       working-directory: TinyInfiniTensor
       continue-on-error: true
     - uses: yfblock/os-autograding@master
@@ -407,6 +425,14 @@ jobs:
         test_output="test_output.txt"
         json_file="./../.github/result/learning-lm-rs_result.json"
 
+        test_list=(
+          "model::test_mlp"
+          "operators::test_rms_norm"
+          "operators::test_matmul_transb"
+          "operators::test_silu"
+          "model::test_load_safetensors"
+        )
+
         # 初始化计数器
         total_exercations=0
         total_succeeds=0
@@ -419,15 +445,19 @@ jobs:
             test_name="${BASH_REMATCH[1]}"
             test_result="${BASH_REMATCH[2]}"
 
-            # 计数
-            total_exercations=$((total_exercations + 1))
-            if [[ $test_result == "FAILED" ]]; then
-              exercises_json+="$(jq -n --arg name "$test_name" --argjson result false '{name: $name, result: $result}'),"
-              total_failures=$((total_failures + 1))
-            else
-              exercises_json+="$(jq -n --arg name "$test_name" --argjson result true '{name: $name, result: $result}'),"
-              total_succeeds=$((total_succeeds + 1))
-            fi
+            for element in "${test_list[@]}"; do
+              if [[ "$element" == "$test_name" ]]; then
+                # 计数
+                total_exercations=$((total_exercations + 1))
+                if [[ $test_result == "FAILED" ]]; then
+                  exercises_json+="$(jq -n --arg name "$test_name" --argjson result false '{name: $name, result: $result}'),"
+                  total_failures=$((total_failures + 1))
+                else
+                  exercises_json+="$(jq -n --arg name "$test_name" --argjson result true '{name: $name, result: $result}'),"
+                  total_succeeds=$((total_succeeds + 1))
+                fi
+              fi
+            done
           fi
         done < "$test_output"
 
