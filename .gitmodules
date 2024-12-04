@@ -1,6 +1,0 @@
-[submodule "rustlings"]
-	path = rustlings
-	url = https://github.com/onenewcode/rustlings.git
-[submodule "learning-cxx"]
-	path = learning-cxx
-	url = https://github.com/onenewcode/learning-cxx.git
