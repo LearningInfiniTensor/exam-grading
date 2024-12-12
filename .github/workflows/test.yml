@@ -2,7 +2,7 @@ name: GitHub Classroom Workflow
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main,dev ]
     paths-ignore:
       - 'README.md'
   pull_request:
@@ -12,8 +12,8 @@ on:
 env:
   CARGO_TERM_COLOR: always
   TZ: Asia/Shanghai # 设置时区
-  ENCODED_API_URL: "aHR0cHM6Ly9hcGkubGVhcm5pbmdjYW1wLmNuL3dlYi9hcGkvY291cnNlUmFuay9jcmVhdGVCeVRoaXJk"
-
+  ENCODED_API_URL: "aHR0cHM6Ly9hcGkubGVhcm5pbmdjYW1wLmNuL3dlYi9hcGkvY291cnNlUmFuay9jcmVhdGVCeVRoaXJkVG9rZW4="
+  TROKEN: "OTdEamJRRFloc3NoNUFOeTNqaDV3N005WWVmV20wWWM="
 jobs:
   initialize:
     name: Initialize Submodules and Check for Experiments
@@ -23,16 +23,21 @@ jobs:
       run_cxx: ${{ steps.check.outputs.run_cxx }}
       run_test: ${{ steps.check.outputs.run_test }}
       api_url: ${{ steps.decode_api_url.outputs.url }}
+      token:     ${{ steps.decode_token.outputs.token }}
       run_project1: ${{ steps.check.outputs.run_project1 }}
       run_project2: ${{ steps.check.outputs.run_project2 }}
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         submodules: recursive # 初始化和更新子模块
     - name: Decode API URL
       id: decode_api_url
       run: |
-        echo "url=$(echo "$ENCODED_API_URL" | base64 --decode)" >> "$GITHUB_OUTPUT"
+        echo "url=$(echo "$ENCODED_API_URL" | base64 --decode)"  >> "$GITHUB_OUTPUT"
+    - name: Decode Token
+      id: decode_token
+      run: |
+        echo "token=$(echo "$TROKEN" | base64 --decode)"  >> "$GITHUB_OUTPUT"
     - name: Check for Rustlings, C++ Experiments and Other Submodules
       id: check
       run: |
@@ -45,11 +50,6 @@ jobs:
           echo "::set-output name=run_cxx::true"
         else
           echo "::set-output name=run_cxx::false"
-        fi
-        if [ -d "exams" ]; then
-          echo "::set-output name=run_test::true"
-        else
-          echo "::set-output name=run_test::false"
         fi
         if [ -d "TinyInfiniTensor" ]; then 
           echo "::set-output name=run_project1::true"
@@ -72,8 +72,9 @@ jobs:
       points: ${{ steps.autograding.outputs.points}}
     env:
       API_URL: ${{ needs.initialize.outputs.api_url }}
+      TOKEN: ${{ needs.initialize.outputs.token }}
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         submodules: 'true'
     - name: Set up Rust environment
@@ -89,6 +90,7 @@ jobs:
     - name: Copy exercises directory to project root
       run: cp -r rustlings/exercises .
     - name: Run tests for rustlings
+    #  
       run: cargo test --test cicv --verbose
       continue-on-error: true
     - uses: yfblock/os-autograding@master
@@ -108,7 +110,7 @@ jobs:
         # 生成新的 JSON 内容
         new_json=$(jq -n \
           --arg channel "github" \
-          --argjson courseId 1700 \
+          --argjson courseId 1752 \
           --arg ext "aaa" \
           --arg name "$github_user" \
           --argjson score "$total_succeeds" \
@@ -129,6 +131,7 @@ jobs:
         curl -X POST "$API_URL" \
           -H "accept: application/json;charset=utf-8" \
           -H "Content-Type: application/json" \
+          -H "token: $TOKEN"\
           -d "$(cat $summary_file)" \
           -v
 
@@ -142,6 +145,7 @@ jobs:
       points: ${{ steps.autograding.outputs.points}}
     env:
       API_URL: ${{ needs.initialize.outputs.api_url }}
+      TOKEN: ${{ needs.initialize.outputs.token }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -212,7 +216,7 @@ jobs:
         # 生成新的 JSON 内容
         new_json=$(jq -n \
           --arg channel "github" \
-          --argjson courseId 1699 \
+          --argjson courseId 1751 \
           --arg ext "aaa" \
           --arg name "$cxx_user" \
           --argjson score "$total_succeeds" \
@@ -233,37 +237,9 @@ jobs:
         curl -X POST "$API_URL" \
           -H "accept: application/json;charset=utf-8" \
           -H "Content-Type: application/json" \
+          -H "token: $TOKEN"\
           -d "$(cat $summary_file)" \
           -v
-
-  test:
-    name: Test Job for Other Submodules
-    needs: initialize
-    if: ${{ needs.initialize.outputs.run_test == 'true' }}
-    runs-on: ubuntu-latest
-    env:
-      API_URL: ${{ needs.initialize.outputs.api_url }}
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
-      with:
-        submodules: 'true'
-    - name: Post summary JSON to remote API
-      run: |
-         curl -X POST "$API_URL" \
-          -H "accept: application/json;charset=utf-8" \
-          -H "Content-Type: application/json" \
-          -d '{
-                "channel": "github",
-                "courseId": 1698,
-                "ext": "aaa",
-                "name": "${{ github.actor }}",
-                "score": 1,
-                "totalScore": 23
-              }' \
-          -v
-
   TinyInfiniTensor:  
     name: TinyInfiniTensor Autograding
     needs: initialize
@@ -276,7 +252,7 @@ jobs:
       API_URL: ${{ needs.initialize.outputs.api_url }}
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         submodules: recursive
     - name: Build TinyInfiniTensor
@@ -399,8 +375,9 @@ jobs:
       points: ${{ steps.autograding.outputs.points}}
     env:
       API_URL: ${{ needs.initialize.outputs.api_url }}
+      TOKEN: ${{ needs.initialize.outputs.token }}
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         submodules: 'true'
     - name: Set up Rust environment for learning-lm-rs
@@ -519,5 +496,6 @@ jobs:
         curl -X POST "$API_URL" \
           -H "accept: application/json;charset=utf-8" \
           -H "Content-Type: application/json" \
+          -H "token: $TOKEN"\
           -d "$(cat $summary_file)" \
           -v
