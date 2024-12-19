@@ -12,7 +12,7 @@ on:
 env:
   CARGO_TERM_COLOR: always
   TZ: Asia/Shanghai # 设置时区
-  ENCODED_API_URL: "aHR0cHM6Ly9hcGkubGVhcm5pbmdjYW1wLmNuL3dlYi9hcGkvY291cnNlUmFuay9jcmVhdGVCeVRoaXJkVG9rZW4="
+  ENCODED_API_URL: "aHR0cHM6Ly9hcGkub3BlbmNhbXAuY24vd2ViL2FwaS9jb3Vyc2VSYW5rL2NyZWF0ZUJ5VGhpcmRUb2tlbg=="
   TROKEN: "OTdEamJRRFloc3NoNUFOeTNqaDV3N005WWVmV20wWWM="
 jobs:
   initialize:
