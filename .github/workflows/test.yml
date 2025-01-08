@@ -2,7 +2,7 @@ name: GitHub Classroom Workflow
 
 on:
   push:
-    branches: [ main,dev ]
+    branches: [ main,dev]
     paths-ignore:
       - 'README.md'
   pull_request:
@@ -250,6 +250,7 @@ jobs:
       points: ${{ steps.autograding.outputs.points}}
     env:
       API_URL: ${{ needs.initialize.outputs.api_url }}
+      TOKEN: ${{ needs.initialize.outputs.token }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -346,7 +347,7 @@ jobs:
 
         new_json=$(jq -n \
           --arg channel "github" \
-          --argjson courseId 1701 \
+          --argjson courseId 1753 \
           --arg ext "aaa" \
           --arg name "$pr1_user" \
           --argjson score "$total_succeeds" \
@@ -362,6 +363,7 @@ jobs:
         curl -X POST "$API_URL" \
           -H "accept: application/json;charset=utf-8" \
           -H "Content-Type: application/json" \
+          -H "token: $TOKEN"\
           -d "$(cat $summary_file)" \
           -v
 
@@ -475,7 +477,7 @@ jobs:
         # 生成新的 JSON 内容
         new_json=$(jq -n \
           --arg channel "github" \
-          --argjson courseId 1703 \
+          --argjson courseId 1754 \
           --arg ext "aaa" \
           --arg name "$pr2_user" \
           --argjson score "$total_succeeds" \
